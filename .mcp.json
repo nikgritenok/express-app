@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "prisma": {
+      "command": "node",
+      "args": ["--env-file-if-exists=.env", "./node_modules/prisma/build/index.js", "mcp"]
+    },
+    "context7": {
+      "type": "http",
+      "url": "https://mcp.context7.com/mcp"
+    }
+  }
+}

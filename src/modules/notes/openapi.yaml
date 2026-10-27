@@ -1,0 +1,155 @@
+openapi: 3.1.0
+info:
+  title: Notes demo API
+  version: 1.0.0
+  description: Unauthenticated learning example. Do not store sensitive data. No list or update endpoint is provided.
+servers:
+  - url: /
+security: []
+paths:
+  /api/notes:
+    post:
+      operationId: createNote
+      summary: Create a note
+      description: No query parameters are accepted. Content is trimmed before validating the 1–2000 UTF-16 code unit limit. JSON bodies are limited to 16 KiB.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateNote"
+      responses:
+        "201":
+          description: Created
+          headers:
+            Location:
+              required: true
+              description: Relative path to the created note
+              schema:
+                type: string
+                example: /api/notes/8e5c7ee2-5f05-4f40-b6a2-c62bce1c5328
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Note"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "413":
+          $ref: "#/components/responses/ContentTooLarge"
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+  /api/notes/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    get:
+      operationId: getNote
+      summary: Read a note
+      description: No query parameters are accepted. Invalid UUIDs return 400 before database access.
+      responses:
+        "200":
+          description: Found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Note"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+    delete:
+      operationId: deleteNote
+      summary: Delete a note
+      description: No query parameters are accepted. Invalid UUIDs return 400 before database access. Repeated deletion returns 404.
+      responses:
+        "204":
+          description: Deleted; empty response body
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+components:
+  schemas:
+    CreateNote:
+      type: object
+      additionalProperties: false
+      required: [content]
+      properties:
+        content:
+          type: string
+          description: Trimmed before validation; the result must contain 1–2000 UTF-16 code units. Raw input may include surrounding whitespace.
+          pattern: '\S'
+    Note:
+      type: object
+      additionalProperties: false
+      required: [id, content, createdAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        content:
+          type: string
+          description: Trimmed content containing 1–2000 UTF-16 code units.
+          minLength: 1
+        createdAt:
+          type: string
+          format: date-time
+    Problem:
+      type: object
+      additionalProperties: false
+      required: [type, title, status, detail, instance]
+      properties:
+        type:
+          const: about:blank
+        title:
+          type: string
+          description: Canonical HTTP status title
+        status:
+          type: integer
+        detail:
+          type: string
+          description: Safe public description; no stack traces or database messages
+        instance:
+          type: string
+          description: Request path without its query string
+  responses:
+    BadRequest:
+      description: Invalid JSON, body, UUID, or unexpected query parameters (400)
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+    NotFound:
+      description: Note does not exist (404)
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+    ContentTooLarge:
+      description: Request body exceeds 16 KiB (413)
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+    UnsupportedMediaType:
+      description: Missing or unsupported media type, charset, or encoding (415)
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+    InternalServerError:
+      description: Generic internal server failure (500)
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
