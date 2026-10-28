@@ -1,6 +1,17 @@
 import type { ErrorRequestHandler } from "express";
 import createError from "http-errors";
 import { STATUS_CODES } from "node:http";
+import { z } from "zod";
+
+export const problemSchema = z
+  .strictObject({
+    type: z.literal("about:blank"),
+    title: z.string(),
+    status: z.number().int(),
+    detail: z.string(),
+    instance: z.string(),
+  })
+  .meta({ id: "Problem", description: "RFC 9457 error without stack traces or database details." });
 
 export class ApiError extends Error {
   readonly status: 400 | 404 | 409 | 415;
