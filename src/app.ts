@@ -1,3 +1,4 @@
+import { apiReference } from "@scalar/express-api-reference";
 import cookieParser from "cookie-parser";
 import express, { type ErrorRequestHandler } from "express";
 import createError, { type HttpError } from "http-errors";
@@ -5,27 +6,44 @@ import logger from "morgan";
 import path from "node:path";
 
 import type { Database } from "./database.ts";
+import { generateOpenApi } from "./http/openapi.ts";
 import { ApiError, apiErrorHandler } from "./http/problem.ts";
-import { createNotesRouter } from "./modules/notes/router.ts";
+import { createNotesModule } from "./modules/notes/router.ts";
 import indexRouter from "./routes/index.ts";
 import usersRouter from "./routes/users.ts";
 
 export function createApp(db: Database) {
   const app = express();
+  const apiModules = [createNotesModule(db)];
+  const openApiDocument = JSON.stringify(generateOpenApi(apiModules));
 
   app.set("views", path.join(import.meta.dirname, "../views"));
   app.set("view engine", "pug");
 
   app.use(logger("dev"));
 
-  const api = express.Router();
-  api.use(express.json({ limit: "16kb" }));
-  api.use("/notes", createNotesRouter(db));
-  api.use(() => {
+  app.get("/openapi.json", (_req, res) => {
+    res.type("application/json").send(openApiDocument);
+  });
+  app.get(
+    "/docs",
+    apiReference({
+      url: "/openapi.json",
+      pageTitle: "express-app API",
+      cdn: "https://cdn.jsdelivr.net/npm/@scalar/api-reference@1.76.0",
+      telemetry: false,
+      withDefaultFonts: false,
+    }),
+  );
+
+  app.use("/api", express.json({ limit: "16kb" }));
+  for (const apiModule of apiModules) {
+    app.use(apiModule.router);
+  }
+  app.use("/api", () => {
     throw new ApiError(404, "API resource not found.");
   });
-  api.use(apiErrorHandler);
-  app.use("/api", api);
+  app.use("/api", apiErrorHandler);
 
   app.use(express.json());
   app.use(express.urlencoded({ extended: false }));

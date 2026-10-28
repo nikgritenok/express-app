@@ -1,11 +1,11 @@
 # Соглашения API
 
-Обязательны для новых API вместе с [правилами команды](TEAM_WORKFLOW.md). Рабочий образец: `src/modules/notes/`, его `openapi.yaml`, `tests/notes.test.ts` и `scripts/notes-smoke.ts`.
+Обязательны для новых API вместе с [правилами команды](TEAM_WORKFLOW.md). Рабочий образец: `src/modules/notes/router.ts`, `schemas.ts`, `tests/notes.test.ts` и `scripts/notes-smoke.ts`.
 
 ## Три уровня требований
 
 - Этот файл задаёт общие правила, а не перечень реализованных endpoints.
-- `src/modules/<module>/openapi.yaml` — точный контракт конкретного модуля: методы, пути, входы, ответы, заголовки, ошибки и примеры. Меняйте его в том же PR, что и поведение; не оставляйте расходящиеся копии схем и документации.
+- `src/modules/<module>/schemas.ts` и вызовы `api.register` в `router.ts` — точный контракт конкретного модуля: общие Zod-схемы, методы, пути, входы, ответы, заголовки, ошибки и примеры. Меняйте их в том же PR, что и поведение; не дублируйте схемы в ручном JSON Schema, YAML или JSDoc. Результат генерации доступен по `/openapi.json`, Scalar — по `/docs`.
 - Issue задаёт цель, границы и проверяемые критерии приёмки. Критерии не заменяют OpenAPI. Изменение согласованного контракта сначала согласуйте с captain в Issue.
 
 ## Пути, данные и HTTP
@@ -24,12 +24,55 @@
 
 ## Сборка приложения и legacy
 
-- Модуль экспортирует фабрику router с внедрённым `Database`. Не создавайте PrismaClient на запрос. Captain явно подключает router в `createApp(db)`; автопоиска middleware нет. Модуль не открывает порт.
+- Модуль экспортирует фабрику `ApiModule` с внедрённым `Database`, используя `createApiModule()` из `src/http/openapi.ts`. Не создавайте PrismaClient на запрос. Captain один раз включает фабрику в массив `apiModules` в `createApp(db)`: этот единственный список определяет и подключённые routers, и документацию всех их регистраций. Автопоиска неподключённых модулей нет. Модуль не открывает порт.
 - Существующие GET `/`, `/users`, статические файлы и HTML-ошибки вне `/api` остаются legacy-контрактом. Не переводите их на JSON и не меняйте их parser/ошибки попутно. Неизвестный путь под `/api` возвращает Problem `404`, а не HTML.
+
+## Добавление операции
+
+1. В принадлежащем вам модуле объявите входные и выходные Zod-схемы в `schemas.ts`. Имена, описания и примеры задавайте через `.meta({ id, description, example })`, где нужны. Используйте те же объекты входных схем в `safeParse` обработчика и метаданных регистрации.
+2. Вместо отдельного `router.get/post` вызовите `api.register({ method, path, request, responses, ... }, handler)` внутри фабрики модуля. Путь полный: `/api/<resource>/{id}`; registrar переводит `{id}` в Express-параметр `:id`. Явно опишите успешные ответы, заголовки и все предусмотренные ошибки, включая общие ошибки parser.
+3. Например, существующее чтение Notes регистрируется так (схемы импортируются из `./schemas.ts`, `ApiError` и `problemResponse` — из общих HTTP-модулей):
+
+   ```ts
+   api.register(
+     {
+       method: "get",
+       path: "/api/notes/{id}",
+       description: "Прочитать заметку по UUID.",
+       request: { params: noteParamsSchema, query: noQuerySchema },
+       responses: {
+         200: {
+           description: "Заметка найдена.",
+           content: { "application/json": { schema: noteResponseSchema } },
+         },
+         400: problemResponse("Неверный UUID или запрещённые query-параметры."),
+         404: problemResponse("Заметка не найдена."),
+         500: problemResponse("Внутренняя ошибка сервера."),
+       },
+     },
+     async (req, res) => {
+       const params = noteParamsSchema.safeParse(req.params);
+       if (!params.success) throw new ApiError(400, "Expected a UUID note identifier.");
+       if (!noQuerySchema.safeParse(req.query).success) {
+         throw new ApiError(400, "Query parameters are not supported.");
+       }
+       const note = await db.note.findUnique({
+         where: { id: params.data.id },
+         select: { id: true, content: true, createdAt: true },
+       });
+       if (!note) throw new ApiError(404, "Note not found.");
+       res.json(note);
+     },
+   );
+   ```
+
+4. Верните `api` из фабрики. Если модуль уже подключён, дополнительный список документации не нужен; для нового модуля запросите у captain включение фабрики в `createApp` один раз. Дополните HTTP-тесты поведения и проверку сгенерированного `/openapi.json`; результат также можно просмотреть в Scalar.
+
+`register` связывает Express и реестр, но не выполняет `safeParse` и не проверяет ответы автоматически. Автор явно задаёт описания, примеры, статусы и соблюдение контракта обработчиком. Генератор не анализирует произвольные Express handlers. Документ генерируется один раз при сборке приложения, а не копируется при build; статическую спецификацию не редактируйте и не добавляйте в Git.
 
 ## Проверяемый образец Notes
 
-- POST `/api/notes`: только JSON `{ "content": "…" }`, без query и неизвестных полей. После trim длина `content` — 1–2000 единиц UTF-16 (длина строки JavaScript). Ответ `201`: `{ "id": "UUID", "content": "…", "createdAt": "ISO8601" }`, `Location: /api/notes/{id}`.
+- POST `/api/notes`: только JSON `{ "content": "…" }`, без query и неизвестных полей. После trim длина `content` — 1–2000 Unicode code points по Zod-схеме, не единиц UTF-16. Ответ `201`: `{ "id": "UUID", "content": "…", "createdAt": "ISO8601" }`, `Location: /api/notes/{id}`.
 - GET `/api/notes/{id}`: UUID проверяется до обращения к БД; `400` для неверного UUID, `200` для существующей заметки, `404` для отсутствующей.
 - DELETE того же пути: такая же проверка UUID; `204` с пустым телом либо `404`.
 - Это неаутентифицированный учебный пример: не храните чувствительные данные. Автотесты HTTP-границ используют настоящее приложение без внешней БД и без подмены БД. Создание, чтение, отсутствие и удаление проверяет smoke с настоящим PostgreSQL; не выдавайте mocks или чтение исходников за эту проверку.
