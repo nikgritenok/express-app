@@ -64,4 +64,4 @@ Branch, pull request, CI, review. Issue and PR templates live in `.github/`. New
 
 ## License
 
-No license yet. Ask before reusing the code.
+MIT, see [LICENSE](LICENSE).
