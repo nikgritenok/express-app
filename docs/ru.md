@@ -1,3 +1,5 @@
+# express-app: стартер бэкенда для хакатона
+
 Стартер для JS-backend хакатона: Express 5, строгий TypeScript, Vitest, Zod, PostgreSQL 17 и Prisma ORM 7.10.1. Шаблоны Pug и существующие HTTP-ответы сохранены.
 
 ## Какой способ запуска выбрать
