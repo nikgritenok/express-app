@@ -1,15 +1,52 @@
 # express-app
 
+Backend starter for a hackathon: Express 5, strict TypeScript, PostgreSQL 17, Prisma 7, Zod, Vitest, and the Pug templates kept from the original skeleton. The OpenAPI document is generated from the same Zod schemas that validate requests, so the docs cannot drift away from the code.
+
+The setup section is written for someone who has never installed Docker. Twenty people clone this the night before the event, and it should not be the setup that breaks them.
+
+## Stack
+
+Express 5, TypeScript in strict mode, Prisma 7.10.1, PostgreSQL 17, Zod, Vitest, Pug, Docker Compose, GitHub Actions.
+
+## Quick start
+
+```bash
+cp .env.example .env
+docker compose up --build
+```
+
+Node 24 LTS and pnpm 12.14.0 are only needed for local development outside Docker.
+
+## What is inside
+
+- `src/modules/notes/` is the reference module: strict Zod schemas, operations registered once for Express and for OpenAPI.
+- `/api/notes` handles create, read and delete. `GET` returns 404 instead of an empty object, `DELETE` returns 204, and bad input gets 400, 415 or 413 before it reaches SQL.
+- Errors under `/api` come back as `application/problem+json`. Unknown failures never leak SQL, stack traces or secrets.
+- `/docs` serves Scalar over the generated `/openapi.json`, with a Test Request button that sends real calls.
+- `pnpm api:smoke` starts the app on a loopback port and runs create, read and delete over real HTTP, then removes only its own record.
+
+## Team workflow
+
+Branches, pull requests, CI, review. Issue and PR templates live in `.github/`. New routes go through the module registry, not through `router.get`.
+
+The Russian part below keeps the full setup walkthrough, the command list and the notes on Prisma tooling for AI agents.
+
+---
+
+# Документация на русском
+
+## express-app
+
 Стартер для JS-backend хакатона: Express 5, строгий TypeScript, Vitest, Zod, PostgreSQL 17 и Prisma ORM 7.10.1. Шаблоны Pug и существующие HTTP-ответы сохранены.
 
-## Какой способ запуска выбрать
+### Какой способ запуска выбрать
 
 - **Через Docker Compose:** установите Git и Docker. Node.js, pnpm и зависимости установятся внутри образа; на компьютере они не обязательны.
 - **Локально:** установите Git, Node.js 24 LTS и pnpm 12.14.0. Нужен доступ к PostgreSQL: через Docker Compose либо собственный PostgreSQL. Для подсказок типов в редакторе установите зависимости и выполните `pnpm db:generate`.
 
 Первую установку и запуск каждый участник должен выполнить **до хакатона**: для скачивания инструментов, образов и пакетов нужен интернет.
 
-## 1. Установить Git
+### 1. Установить Git
 
 Официальная страница: [установка Git](https://git-scm.com/install/).
 
@@ -32,7 +69,7 @@ git --version
 
 Перед первым коммитом настройте своё имя и email командами `git config --global user.name` и `git config --global user.email`, передав им свои значения.
 
-## 2. Установить Docker — для контейнерного запуска
+### 2. Установить Docker — для контейнерного запуска
 
 Для Windows и macOS проще использовать **Docker Desktop**: в него уже входят Docker Engine и Docker Compose. Устанавливать старую отдельную утилиту `docker-compose` не нужно; команды ниже используют `docker compose`.
 
@@ -53,11 +90,11 @@ docker run --rm hello-world
 
 `docker info` должен показывать работающий сервер без ошибки подключения. Установка только Docker CLI недостаточна.
 
-## 3. Получить проект
+### 3. Получить проект
 
 Склонируйте репозиторий через `git clone`, указав адрес репозитория команды, и откройте полученный каталог в терминале и редакторе. Адрес можно скопировать на странице репозитория у вашего Git-хостинга. Все дальнейшие команды выполняются из каталога с `package.json` и `compose.yaml`.
 
-## Настроить окружение
+### Настроить окружение
 
 Скопируйте безопасный пример `.env.example` в `.env`.
 
@@ -102,7 +139,7 @@ docker compose up --detach --force-recreate
 
 `pnpm test`, `pnpm test:watch` и `pnpm verify` не загружают `.env` или `.env.test`, включая переменные с префиксом `VITE_`: автозагрузка отключена через `envDir: false` в `vitest.config.ts`. Переменные уже запущенного процесса по-прежнему наследуются; тесты схемы передают явные входные данные и не меняют `process.env`. При добавлении новой переменной обновляйте схему, `.env.example` и эту инструкцию; секреты передавайте отдельно.
 
-## 4. Запустить через Docker Compose
+### 4. Запустить через Docker Compose
 
 ```sh
 docker compose up --build
@@ -141,7 +178,7 @@ docker compose run --rm app pnpm verify
 docker compose down
 ```
 
-## 5. Установить Node.js и pnpm — для локальной разработки
+### 5. Установить Node.js и pnpm — для локальной разработки
 
 Этот раздел можно пропустить, если запускаете приложение только в Docker.
 
@@ -161,7 +198,7 @@ docker compose down
 
 Нужны Node.js версии 24 или новее и pnpm версии 12.14.0. Для одинакового окружения команды используйте Node.js 24 LTS; эта же основная версия используется в Dockerfile.
 
-## 6. Запустить локально
+### 6. Запустить локально
 
 ```sh
 pnpm install --frozen-lockfile
@@ -188,7 +225,7 @@ pnpm start
 
 Для production-режима дополнительно задайте переменную окружения `NODE_ENV=production` средствами вашей ОС или хостинга. Без неё Express использует development-режим.
 
-## Команды
+### Команды
 
 | Команда                              | Назначение                                                                                               |
 | ------------------------------------ | -------------------------------------------------------------------------------------------------------- |
@@ -214,7 +251,7 @@ pnpm start
 
 `pnpm verify` ничего не исправляет автоматически. Если не проходит форматирование, выполните `pnpm format` локально и запустите verify заново. В Compose исходники read-only; исключение — отдельный volume с генерируемым Prisma Client. `dist/`, `node_modules/`, `src/generated/`, скачанные официальные skills и генерируемый `pnpm-lock.yaml` не форматируются. `dev`, `check`, `test`, `test:watch` и `build` явно генерируют клиент, не включая install scripts зависимостей. Поэтому обычный `pnpm test` работает после установки зависимостей без ручной генерации и по-прежнему не загружает `.env`.
 
-## Тесты: Vitest
+### Тесты: Vitest
 
 ```sh
 # Все тесты один раз; этот режим использует CI
@@ -231,7 +268,7 @@ pnpm test tests/config.test.ts
 
 Vitest преобразует TypeScript для выполнения тестов, но обычный запуск **не проверяет типы**. Поэтому `pnpm check` отдельно запускает `tsc` для исходников, тестов и конфигурации Vitest, а `pnpm verify` сохраняет оба этапа. Само приложение по-прежнему запускается нативно в Node.js; Vite-сборка backend не добавлена.
 
-## Схемы: Zod
+### Схемы: Zod
 
 `src/config.ts` экспортирует чистую `environmentSchema`, без чтения `process.env` или `.env` при импорте. `src/server.ts` валидирует окружение, использует типизированный числовой `PORT` и режим `NODE_ENV`, затем создаёт сервер. Посторонние переменные окружения не попадают в результат схемы. Zod — runtime-зависимость: проверка работает и в production-образе.
 
@@ -239,7 +276,7 @@ Vitest преобразует TypeScript для выполнения тесто�
 
 Zod проверяет конфигурацию сервера и входы эталонного Notes API. Общие HTTP-правила находятся в [API_CONVENTIONS.md](API_CONVENTIONS.md), точный контракт заметок — в `src/modules/notes/schemas.ts` и вызовах `api.register` в `router.ts`. Legacy-маршруты и HTML-ошибки вне `/api` сохранены.
 
-## PostgreSQL и Prisma
+### PostgreSQL и Prisma
 
 `prisma/schema.prisma` описывает таблицы, `prisma/migrations/` хранит SQL-миграции. Модель `Note` используется эталонным API и командой `pnpm db:smoke`. Эта команда создаёт запись, проверяет сохранённые поля и удаляет её в одной транзакции. Существующие `/` и `/users` не обращаются к БД.
 
@@ -259,7 +296,7 @@ Zod проверяет конфигурацию сервера и входы э�
 
 `migrate dev` требует права создавать shadow database. В production применяйте только готовые миграции отдельным шагом до запуска приложения. Обычный `pnpm verify` и CI не требуют PostgreSQL и не подгружают `.env`; проверку реальной БД запускайте отдельно.
 
-## Эталонный модуль и реальная HTTP-проверка
+### Эталонный модуль и реальная HTTP-проверка
 
 `src/modules/notes/` содержит API-модуль с внедрённой БД, строгие Zod-схемы и регистрации операций для Express и OpenAPI. Это небольшой публичный учебный пример без авторизации; не записывайте чувствительные данные и не считайте его готовой системой разграничения доступа.
 
@@ -286,7 +323,7 @@ docker compose exec app pnpm api:smoke
 
 `tests/notes.test.ts` и `tests/http.test.ts` проверяют настоящим HTTP входные границы и ошибки до SQL, без внешней БД и без моков. Они входят в обычный `pnpm verify`; успешную работу с PostgreSQL доказывает отдельный `api:smoke`. Общие HTTP test helpers находятся в `tests/helpers/http.ts`, принадлежат интегратору и не копируются в каждый модуль.
 
-## Интерактивная документация Scalar
+### Интерактивная документация Scalar
 
 После запуска приложения откройте [http://localhost:3000/docs](http://localhost:3000/docs). При другом HTTP-порте используйте тот же адрес приложения с путём `/docs`.
 
@@ -300,7 +337,7 @@ Scalar отображает сгенерированный `/openapi.json`: сх
 
 `/docs` и `/openapi.json` доступны без авторизации, как и учебный Notes API. Не включайте секреты в OpenAPI-примеры и не считайте документацию механизмом защиты API. Captain владеет общим registrar/generator и подключением фабрики модуля в `createApp`; владелец модуля — схемами, метаданными операций и тестами. Все регистрации уже подключённого модуля попадают в документацию автоматически; отдельного списка для документации и автопоиска неподключённых модулей нет.
 
-## Официальные инструменты Prisma для AI
+### Официальные инструменты Prisma для AI
 
 - CLI установлен локально: `prisma`, `@prisma/client` и `@prisma/adapter-pg` зафиксированы на **7.10.1**. Используйте `pnpm db ...`, не плавающий `npx prisma@latest`: npm `latest` может указывать на Prisma 8 RC.
 - `.mcp.json` запускает **локальный** официальный сервер `prisma mcp` из установленного пакета. Он предоставляет `migrate-status`, `migrate-dev` и `Prisma-Studio`; использует окружение проекта и `.env`, не требует Prisma Cloud/OAuth. После установки зависимостей перезапустите MCP-клиент в корне проекта и подтвердите подключение, если он спросит. Наличие файла не включает сервер в уже открытой сессии.
@@ -310,7 +347,7 @@ Scalar отображает сгенерированный `/openapi.json`: сх
 
 Официальные инструкции: [skills](https://www.prisma.io/docs/ai/tools/skills), [локальный MCP](https://github.com/prisma/skills/blob/72aa5e3b6fea2cc00cefcf8a5decc84ec1d6302b/prisma-cli/references/mcp.md). Текущий [удалённый MCP](https://www.prisma.io/docs/ai/tools/mcp-server) по адресу `https://mcp.prisma.io/mcp` — отдельный сервис Prisma Cloud; он здесь не подключён. MCP может изменять схему: подтверждайте миграции только после проверки целевой БД и SQL.
 
-## Структура
+### Структура
 
 - `src/app.ts` — фабрика `createApp(db)`, подключение модулей и раздельные API/HTML-ошибки.
 - `src/server.ts` — запуск HTTP-сервера; порт задаётся через `PORT`, по умолчанию 3000.
@@ -331,7 +368,7 @@ Scalar отображает сгенерированный `/openapi.json`: сх
 
 Проект использует `pnpm-lock.yaml`. Для зависимостей используйте pnpm, а не `npm install`. Локальный `pnpm-workspace.yaml` выделяет приложение в отдельный workspace и отключает установочные скрипты зависимостей (`ignoreScripts: true`). Не используйте `--ignore-workspace`: этот флаг отключает локальную конфигурацию.
 
-## Production-образ
+### Production-образ
 
 Docker Compose предназначен для разработки. Отдельный финальный stage Dockerfile содержит скомпилированный JavaScript, шаблоны, статику и только production-зависимости; сервер запускается не от root.
 
@@ -345,7 +382,7 @@ docker run --rm --init --env DATABASE_URL --publish 3000:3000 express-app
 
 Перед запуском production-образа примените `pnpm db:deploy` из checkout с установленными dev-зависимостями, направив его на целевую БД. Финальный образ не содержит Prisma CLI и не создаёт/обновляет таблицы при старте. URL из `.env.example` с `127.0.0.1` не указывает на БД хоста из контейнера: задайте доступный из контейнера адрес.
 
-## Командная работа и CI
+### Командная работа и CI
 
 - Правила AI-агентов: [AGENTS.md](AGENTS.md). Это инструкции, а не техническая песочница: права на команды и доступ к секретам настраиваются в каждом агентском клиенте.
 - Обязательная конвенция API: [API_CONVENTIONS.md](API_CONVENTIONS.md); владение файлами, worktree/БД/порты и порядок небольших PR: [TEAM_WORKFLOW.md](TEAM_WORKFLOW.md).
@@ -364,7 +401,7 @@ GitHub Actions workflow `CI` запускает проверку `verify` на p
 
 Файлы стартера **не включают branch protection автоматически** и не гарантируют ревью именно тимлидом. Настройки GitHub и агентских клиентов необходимо применить отдельно.
 
-## Проверка перед хакатоном
+### Проверка перед хакатоном
 
 Каждый участник должен заранее:
 
