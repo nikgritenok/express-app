@@ -35,8 +35,6 @@ The Russian part below keeps the full setup walkthrough, the command list and th
 
 # Документация на русском
 
-## express-app
-
 Стартер для JS-backend хакатона: Express 5, строгий TypeScript, Vitest, Zod, PostgreSQL 17 и Prisma ORM 7.10.1. Шаблоны Pug и существующие HTTP-ответы сохранены.
 
 ### Какой способ запуска выбрать
